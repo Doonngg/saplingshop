@@ -316,9 +316,6 @@
                 <p><strong>下单时间</strong> <span id="displayTime">--</span></p>
             </div>
         </div>
-        <div class="footer-buttons" style="justify-content: center;">
-            <button class="btn btn-primary" id="saveScreenshotBtn"><i class="fas fa-camera"></i> 保存当前页面为截图</button>
-        </div>
         <p class="text-center" style="color:#9fb4ac; margin-top: 22px;"><i class="far fa-star"></i> 感谢您的购买</p>
     </div>
 </div>
@@ -554,24 +551,6 @@
         showPage(1);
     });
 
-    // 保存截图
-    document.getElementById('saveScreenshotBtn').addEventListener('click', function() {
-        const area = document.getElementById('screenshot-area');
-        if (!area) return;
-        html2canvas(area, {
-            scale: 1.5,
-            backgroundColor: '#f0f7f4',
-            allowTaint: false,
-            useCORS: true
-        }).then(canvas => {
-            const link = document.createElement('a');
-            link.download = '付款成功_' + new Date().getTime() + '.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }).catch(err => {
-            alert('截图失败，但可用系统截图。' + err);
-        });
-    });
 
     // 默认显示页面1
     showPage(1);
