@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>立即抢购</title>
+    <!-- Font Awesome 6 (免费图标) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- html2canvas 用于保存截图 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            background: #f5f7fb;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 16px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 1100px;
+            background: white;
+            border-radius: 32px 32px 24px 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05), 0 6px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            padding: 24px 20px 32px;
+        }
+
+        /* 步骤指示器 (三个点: 填写 · 支付 · 完成) */
+        .step-indicator {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 28px;
+            justify-content: center;
+        }
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            background: #ddd;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+        .step-dot.active {
+            background: #2a7a62;
+            width: 28px;
+        }
+
+        .page {
+            display: none;
+            animation: fade 0.25s ease;
+        }
+        .page.active-page {
+            display: block;
+        }
+        @keyframes fade {
+            from { opacity: 0.3; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---------- 表单组件 ---------- */
+        .form-group {
+            margin-bottom: 22px;
+        }
+        label {
+            font-weight: 500;
+            font-size: 0.95rem;
+            color: #3e4f4a;
+            display: block;
+            margin-bottom: 6px;
+        }
+        input, select {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1.5px solid #e2e8e6;
+            border-radius: 30px;
+            font-size: 1rem;
+            background: #fbfdfc;
+            transition: 0.15s;
+            outline: none;
+            font-family: inherit;
+        }
+        input:focus, select:focus {
+            border-color: #2a7a62;
+            box-shadow: 0 0 0 3px rgba(42,122,98,0.15);
+            background: white;
+        }
+        .region-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .region-select {
+            flex: 1 1;
+            min-width: 110px;
+        }
+        .region-select select {
+            padding: 14px 10px;
+            background: white;
+        }
+
+        /* 按钮 */
+        .btn {
+            background: white;
+            border: 1.5px solid #2a7a62;
+            color: #2a7a62;
+            font-weight: 600;
+            padding: 12px 20px;
+            border-radius: 60px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-primary {
+            background: #2a7a62;
+            color: white;
+            border: none;
+            box-shadow: 0 6px 14px rgba(42, 122, 98, 0.3);
+        }
+        .btn-primary:hover, .btn-primary:active {
+            background: #1e5c4a;
+            transform: scale(1.02);
+        }
+        .btn-block {
+            width: 100%;
+        }
+        .footer-buttons {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+            flex-wrap: wrap;
+        }
+
+        /* 支付页面中间的插图 */
+        .payment-illustration {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f3f9f6;
+            padding-bottom: 40px;
+            margin: 24px 0 28px;
+            text-align: center;
+        }
+		.payment-illustration img{
+			width: 100%;
+		}
+        .payment-img {
+            font-size: 5rem;
+            color: #2a7a62;
+            background: #d4f0e6;
+            width: 160px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 60px;
+            margin-bottom: 28px;
+        }
+        .payment-hint {
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: #1a3a32;
+            max-width: 280px;
+			margin-top: 40px;
+        }
+        .payment-hint small {
+            display: block;
+            margin-top: 12px;
+            font-size: 0.95rem;
+            font-weight: 400;
+            color: #5e7b72;
+        }
+
+        /* 付款成功卡片 (用于截图区域) */
+        .success-card {
+            background: #f0f7f4;
+            border-radius: 40px;
+            padding: 32px 28px;
+            margin: 20px 0 28px;
+            border: 2px solid #cceae0;
+            box-shadow: 0 15px 30px rgba(42,122,98,0.1);
+        }
+        .success-icon {
+            font-size: 4rem;
+            color: #2a7a62;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .order-info p {
+            font-size: 1.1rem;
+            margin: 16px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #bdd9d0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .order-info strong {
+            width: 100px;
+            color: #1c4d41;
+        }
+        .order-info span {
+            color: #2b3e38;
+            word-break: break-word;
+            flex: 1;
+        }
+
+        .mt-4 { margin-top: 24px; }
+        .text-center { text-align: center; }
+        i { pointer-events: none; }
+
+        /* 小屏优化 */
+        @media (max-width: 480px) {
+            .app-container { padding: 16px; }
+            .region-row { flex-direction: column; gap: 8px; }
+            .order-info p { flex-direction: column; gap: 5px; }
+            .order-info strong { width: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 步骤点 (填写 · 支付 · 完成) -->
+    <div class="step-indicator">
+        <span class="step-dot active" id="stepDot1"></span>
+        <span class="step-dot" id="stepDot2"></span>
+        <span class="step-dot" id="stepDot3"></span>
+    </div>
+
+    <!-- ========== 页面1：填写收件信息 ========= -->
+    <div id="page1" class="page active-page">
+        <h2 style="margin-bottom: 20px;">📦 填写收货信息</h2>
+        <form id="addressForm" onsubmit="return false;">
+            <div class="form-group">
+                <label><i class="far fa-user"></i> 姓名 <span style="color:#c44536;">*</span></label>
+                <input type="text" id="fullName" placeholder="如：张小明" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-mobile-alt"></i> 手机号 <span style="color:#c44536;">*</span></label>
+                <input type="tel" id="mobile" placeholder="11位手机号" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-map-marked-alt"></i> 所在地区 <span style="color:#c44536;">*</span></label>
+                <div class="region-row">
+                    <div class="region-select">
+                        <select id="province" required>
+                            <option value="" disabled selected>省/市</option>
+                        </select>
+                    </div>
+                    <div class="region-select">
+                        <select id="city" required>
+                            <option value="" disabled selected>城市</option>
+                        </select>
+                    </div>
+                    <div class="region-select">
+                        <select id="district" required>
+                            <option value="" disabled selected>区/县</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-location-dot"></i> 详细地址 <span style="color:#c44536;">*</span></label>
+                <input type="text" id="detailAddr" placeholder="街道、门牌号等" required>
+            </div>
+            <div class="footer-buttons">
+                <button class="btn btn-primary btn-block" id="nextToPayment" style="width:100%;">下一步 <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ========== 页面2：支付页面 ========= -->
+    <div id="page2" class="page">
+        <h2 class="text-center" style="margin-bottom: 10px;">💳 支付订单</h2>
+        <div class="payment-illustration">
+            <img src="wx.jpg"/>
+            <div class="payment-hint">
+               长按识别二维码</br>或保存到相册支付
+                <small>支付完成请将支付截图发给客服</small>
+            </div>
+        </div>
+        <div class="footer-buttons" style="justify-content: center;">
+            <button class="btn" id="backToAddress"><i class="fas fa-edit"></i> 修改地址</button>
+            <button class="btn btn-primary" id="finishPayment"><i class="fas fa-check-circle"></i> 付款完成</button>
+        </div>
+        <p class="text-center" style="color:#9fb4ac; margin-top: 22px;"><i class="far fa-clock"></i> 订单保留30分钟</p>
+    </div>
+
+    <!-- ========== 页面3：付款成功 ========= -->
+    <div id="page3" class="page">
+        <h2 class="text-center" style="margin-bottom: 10px;">✅ 付款成功</h2>
+        <!-- 截图区域包裹整个success-card，方便截图 -->
+        <div id="screenshot-area" class="success-card">
+            <div class="success-icon">
+                <i class="fas fa-circle-check"></i>
+            </div>
+            <div class="order-info" id="orderInfo">
+                <p><strong>收货人</strong> <span id="displayName">--</span></p>
+                <p><strong>手机号</strong> <span id="displayMobile">--</span></p>
+                <p><strong>收货地址</strong> <span id="displayAddress">--</span></p>
+                <p><strong>订单编号</strong> <span id="displayOrderNo">--</span></p>
+                <p><strong>下单时间</strong> <span id="displayTime">--</span></p>
+            </div>
+        </div>
+        <div class="footer-buttons" style="justify-content: center;">
+            <button class="btn btn-primary" id="saveScreenshotBtn"><i class="fas fa-camera"></i> 保存当前页面为截图</button>
+        </div>
+        <p class="text-center" style="color:#9fb4ac; margin-top: 22px;"><i class="far fa-star"></i> 感谢您的购买</p>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ---------- 省市区数据将从外部 pca.json 加载 ----------
+    let areaDB = {};  // 初始为空，加载后填充
+
+    // DOM 元素
+    const page1 = document.getElementById('page1');
+    const page2 = document.getElementById('page2');
+    const page3 = document.getElementById('page3');
+    const stepDots = [document.getElementById('stepDot1'), document.getElementById('stepDot2'), document.getElementById('stepDot3')];
+
+    const provinceSelect = document.getElementById('province');
+    const citySelect = document.getElementById('city');
+    const districtSelect = document.getElementById('district');
+
+    // ---------- 页面切换 ----------
+    function showPage(pageNumber) {
+        page1.classList.remove('active-page');
+        page2.classList.remove('active-page');
+        page3.classList.remove('active-page');
+        stepDots.forEach(d => d.classList.remove('active'));
+        if (pageNumber === 1) {
+            page1.classList.add('active-page');
+            stepDots[0].classList.add('active');
+        } else if (pageNumber === 2) {
+            page2.classList.add('active-page');
+            stepDots[1].classList.add('active');
+        } else if (pageNumber === 3) {
+            page3.classList.add('active-page');
+            stepDots[2].classList.add('active');
+        }
+    }
+
+    // ---------- 省市区联动函数 (依赖 areaDB) ----------
+    function updateCities(province) {
+        citySelect.innerHTML = '<option value="" disabled selected>城市</option>';
+        districtSelect.innerHTML = '<option value="" disabled selected>区/县</option>';
+        if (!province || !areaDB[province]) return;
+        const cities = Object.keys(areaDB[province]);
+        cities.forEach(c => {
+            const option = document.createElement('option');
+            option.value = c;
+            option.textContent = c;
+            citySelect.appendChild(option);
+        });
+    }
+
+    function updateDistricts(province, city) {
+        districtSelect.innerHTML = '<option value="" disabled selected>区/县</option>';
+        if (!province || !city || !areaDB[province] || !areaDB[province][city]) return;
+        const districts = areaDB[province][city];
+        districts.forEach(d => {
+            const option = document.createElement('option');
+            option.value = d;
+            option.textContent = d;
+            districtSelect.appendChild(option);
+        });
+    }
+
+    // 绑定 change 事件
+    provinceSelect.addEventListener('change', function() { updateCities(this.value); });
+    citySelect.addEventListener('change', function() { updateDistricts(provinceSelect.value, this.value); });
+
+    // ---------- 初始化省份下拉 (数据已就绪时调用) ----------
+    function initProvinces() {
+        // 清空并填充省份
+        provinceSelect.innerHTML = '<option value="" disabled selected>省/市</option>';
+        const provinces = Object.keys(areaDB).sort((a,b) => a.localeCompare(b, 'zh'));
+        provinces.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p;
+            option.textContent = p;
+            provinceSelect.appendChild(option);
+        });
+
+        // 默认选中北京市（如果存在）
+        if (provinces.includes('北京市')) {
+            provinceSelect.value = '北京市';
+            provinceSelect.dispatchEvent(new Event('change'));
+
+            // 等待城市列表渲染后默认选中第一个城市及区县
+            setTimeout(() => {
+                if (citySelect.options.length > 1) {
+                    citySelect.selectedIndex = 1; // 选择第一个城市
+                    citySelect.dispatchEvent(new Event('change'));
+                    setTimeout(() => {
+                        if (districtSelect.options.length > 1) {
+                            districtSelect.selectedIndex = 1; // 选择第一个区县
+                        }
+                    }, 50);
+                }
+            }, 100);
+        }
+    }
+
+    // ---------- 异步加载 pca.json ----------
+    fetch('./pca.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('网络响应失败');
+            }
+            return response.json();
+        })
+        .then(data => {
+            areaDB = data;          // 将获取的数据赋值给 areaDB
+            initProvinces();        // 初始化下拉框
+        })
+        .catch(error => {
+            console.error('加载省市区数据失败:', error);
+            alert('加载省市区数据失败，请刷新页面重试。');
+            // 可降级显示简单提示，但为了体验，留空省份下拉
+            provinceSelect.innerHTML = '<option value="" disabled selected>加载失败</option>';
+        });
+
+    // ---------- 表单验证 & 存储 (保持不变) ----------
+    function validateForm() {
+        const name = document.getElementById('fullName').value.trim();
+        const mobile = document.getElementById('mobile').value.trim();
+        const province = provinceSelect.value;
+        const city = citySelect.value;
+        const district = districtSelect.value;
+        const detail = document.getElementById('detailAddr').value.trim();
+
+        if (!name) { alert('请填写姓名'); return false; }
+        if (!mobile || !/^\d{11}$/.test(mobile)) { alert('请输入11位手机号'); return false; }
+        if (!province) { alert('请选择省份'); return false; }
+        if (!city) { alert('请选择城市'); return false; }
+        if (!district) { alert('请选择区县'); return false; }
+        if (!detail) { alert('请填写详细地址'); return false; }
+        return true;
+    }
+
+    function saveFormData() {
+        const name = document.getElementById('fullName').value.trim();
+        const mobile = document.getElementById('mobile').value.trim();
+        const province = provinceSelect.value;
+        const city = citySelect.value;
+        const district = districtSelect.value;
+        const detail = document.getElementById('detailAddr').value.trim();
+        const fullAddress = province + ' ' + city + ' ' + district + ' ' + detail;
+        const formData = { name, mobile, province, city, district, detail, fullAddress };
+        sessionStorage.setItem('addressInfo', JSON.stringify(formData));
+        return formData;
+    }
+
+    function getAddressData() {
+        const stored = sessionStorage.getItem('addressInfo');
+        return stored ? JSON.parse(stored) : null;
+    }
+
+    // ---------- 页面跳转逻辑 ----------
+    document.getElementById('nextToPayment').addEventListener('click', function(e) {
+        if (!validateForm()) return;
+        saveFormData();
+        showPage(2);
+    });
+
+    document.getElementById('backToAddress').addEventListener('click', function() {
+        showPage(1);
+    });
+
+    document.getElementById('finishPayment').addEventListener('click', function() {
+        const addrData = getAddressData();
+        if (!addrData) {
+            alert('收货信息不存在，请重新填写');
+            showPage(1);
+            return;
+        }
+        // 生成随机订单号
+        const randomStr = Math.random().toString(36).substring(2,10).toUpperCase();
+        const orderNo = 'ORD' + randomStr;
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2,'0');
+        const day = String(now.getDate()).padStart(2,'0');
+        const hour = String(now.getHours()).padStart(2,'0');
+        const minute = String(now.getMinutes()).padStart(2,'0');
+        const second = String(now.getSeconds()).padStart(2,'0');
+        const orderTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+
+        const orderDetails = { ...addrData, orderNo, orderTime };
+        sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
+
+        showPage(3);
+        renderSuccessPage(orderDetails);
+    });
+
+    function renderSuccessPage(data) {
+        document.getElementById('displayName').innerText = data.name || '--';
+        document.getElementById('displayMobile').innerText = data.mobile || '--';
+        document.getElementById('displayAddress').innerText = data.fullAddress || '--';
+        document.getElementById('displayOrderNo').innerText = data.orderNo || '--';
+        document.getElementById('displayTime').innerText = data.orderTime || '--';
+    }
+
+    // 当页面3被激活时，重新渲染（防止刷新丢失）
+    page3.addEventListener('click', function() {
+        if (page3.classList.contains('active-page')) {
+            const details = sessionStorage.getItem('orderDetails');
+            if (details) {
+                renderSuccessPage(JSON.parse(details));
+            }
+        }
+    });
+
+    // 成功页「重新下单」返回收件页并填充之前数据
+    document.getElementById('backToHomeFromSuccess').addEventListener('click', function() {
+        const old = getAddressData();
+        if (old) {
+            document.getElementById('fullName').value = old.name || '';
+            document.getElementById('mobile').value = old.mobile || '';
+            document.getElementById('detailAddr').value = old.detail || '';
+
+            // 回显省市区（需要确保数据已加载，且旧值存在）
+            if (old.province && areaDB[old.province]) {
+                provinceSelect.value = old.province;
+                provinceSelect.dispatchEvent(new Event('change'));
+                setTimeout(() => {
+                    if (old.city && areaDB[old.province]?.[old.city]) {
+                        citySelect.value = old.city;
+                        citySelect.dispatchEvent(new Event('change'));
+                        setTimeout(() => {
+                            if (old.district) districtSelect.value = old.district;
+                        }, 50);
+                    }
+                }, 50);
+            }
+        }
+        showPage(1);
+    });
+
+    // 保存截图
+    document.getElementById('saveScreenshotBtn').addEventListener('click', function() {
+        const area = document.getElementById('screenshot-area');
+        if (!area) return;
+        html2canvas(area, {
+            scale: 1.5,
+            backgroundColor: '#f0f7f4',
+            allowTaint: false,
+            useCORS: true
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = '付款成功_' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }).catch(err => {
+            alert('截图失败，但可用系统截图。' + err);
+        });
+    });
+
+    // 默认显示页面1
+    showPage(1);
+})();
+</script>
+</body>
+</html>
