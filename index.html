@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>立即抢购</title>
+    <title>立即抢购 · 保存收款码</title>
     <!-- Font Awesome 6 (免费图标) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- html2canvas 用于保存截图 -->
+    <!-- html2canvas 用于保存截图 (保留未使用但无妨) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * {
@@ -109,6 +109,7 @@
 
         /* 按钮 */
         .btn {
+			width: 148px;
             background: white;
             border: 1.5px solid #2a7a62;
             color: #2a7a62;
@@ -287,13 +288,14 @@
     <div id="page2" class="page">
         <h2 class="text-center" style="margin-bottom: 10px;">💳 支付订单</h2>
         <div class="payment-illustration">
-            <img src="wx.jpg"/>
+            <img src="wx.jpg" alt="收款二维码" id="payQrCode"/>
             <div class="payment-hint">
                长按二维码保存到相册支付
                 <small>支付完成请将支付截图发给客服</small>
             </div>
         </div>
         <div class="footer-buttons" style="justify-content: center;">
+            <!-- 原“修改地址”按钮将被替换为“保存收款码” (通过JS替换) 保留id便于定位 -->
             <button class="btn" id="backToAddress"><i class="fas fa-edit"></i> 修改地址</button>
             <button class="btn btn-primary" id="finishPayment"><i class="fas fa-check-circle"></i> 付款完成</button>
         </div>
@@ -477,9 +479,8 @@
         showPage(2);
     });
 
-    document.getElementById('backToAddress').addEventListener('click', function() {
-        showPage(1);
-    });
+    // 原“修改地址”按钮将稍后被替换为下载按钮，此处保留原监听（但会被移除，因为按钮被替换）。为避免干扰，不再添加原有监听。
+    // 我们不在全局绑定 backToAddress 的旧逻辑，后续会用新按钮替换。
 
     document.getElementById('finishPayment').addEventListener('click', function() {
         const addrData = getAddressData();
@@ -525,35 +526,71 @@
         }
     });
 
-    // 成功页「重新下单」返回收件页并填充之前数据
-    document.getElementById('backToHomeFromSuccess').addEventListener('click', function() {
-        const old = getAddressData();
-        if (old) {
-            document.getElementById('fullName').value = old.name || '';
-            document.getElementById('mobile').value = old.mobile || '';
-            document.getElementById('detailAddr').value = old.detail || '';
-
-            // 回显省市区（需要确保数据已加载，且旧值存在）
-            if (old.province && areaDB[old.province]) {
-                provinceSelect.value = old.province;
-                provinceSelect.dispatchEvent(new Event('change'));
-                setTimeout(() => {
-                    if (old.city && areaDB[old.province]?.[old.city]) {
-                        citySelect.value = old.city;
-                        citySelect.dispatchEvent(new Event('change'));
-                        setTimeout(() => {
-                            if (old.district) districtSelect.value = old.district;
-                        }, 50);
-                    }
-                }, 50);
-            }
-        }
-        showPage(1);
-    });
-
+    // ---------- 移除原“重新下单”按钮监听 (因页面中无此按钮，避免报错) ----------
+    // 原代码中有一段 document.getElementById('backToHomeFromSuccess') 的监听，但该元素不存在，已删除。
+    // 如果后续需要重新下单功能，可自行在成功页添加对应按钮。
 
     // 默认显示页面1
     showPage(1);
+
+    // ---------- ★ 重点改造：将支付页的“修改地址”按钮替换为“保存收款码”下载按钮 ----------
+    function replaceButtonWithDownload() {
+        const oldBtn = document.getElementById('backToAddress');
+        if (!oldBtn) return;
+
+        const parent = oldBtn.parentNode;
+        if (!parent) return;
+
+        // 创建新按钮，保留相同的class和id
+        const newBtn = document.createElement('button');
+        newBtn.className = oldBtn.className;      // 保持 "btn" 样式
+        newBtn.id = 'backToAddress';              // 保留id，便于其他逻辑（如果有）
+        newBtn.innerHTML = '<i class="fas fa-download"></i> 保存收款码';
+
+        // 替换旧按钮
+        parent.replaceChild(newBtn, oldBtn);
+
+        // 为新按钮添加下载功能 (使用fetch获取图片blob，兼容性好且能指定文件名)
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // 获取支付页面的二维码图片
+            const qrImg = document.querySelector('#page2 .payment-illustration img');
+            if (!qrImg) {
+                alert('未找到收款码图片，请稍后重试或长按保存');
+                return;
+            }
+
+            const imgSrc = qrImg.src;  // 通常为相对路径 wx.jpg 或转为绝对URL
+
+            // 使用fetch获取图片资源，转为blob下载，可指定文件名，避免a.download在同域下的限制
+            fetch(imgSrc, { mode: 'cors', cache: 'force-cache' }) // 同域下cors没问题
+                .then(response => {
+                    if (!response.ok) throw new Error('网络响应错误');
+                    return response.blob();
+                })
+                .then(blob => {
+                    // 创建blob url
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = '收款码.jpg';   // 指定下载文件名
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(blobUrl);   // 释放内存
+                })
+                .catch(err => {
+                    console.warn('下载失败，尝试直接打开图片', err);
+                    // 降级方案：打开图片新窗口，提示长按保存
+                    alert('自动下载失败，请长按图片选择“保存图像”');
+                    window.open(imgSrc, '_blank');
+                });
+        });
+    }
+
+    // 执行替换 (DOM已就绪)
+    replaceButtonWithDownload();
+
 })();
 </script>
 </body>
